@@ -1,21 +1,59 @@
 <p align="center">
-  <img src="assets/CrowdInsight.png" alt="CrowdInsight Logo" width="500"/>
+  <img src="assets/CrowdInsight.png" alt="CrowdInsight Logo" width="1000", borderradius="22px"/>
 </p>
 
 # CrowdInsight
 
-CrowdInsight is a Python-based computer vision and AI library designed to analyze foot traffic and visitor demographics using CCTV footage or live streams. It detects and classifies entities such as adults, children, men, women, and animals (e.g., dogs), and generates actionable insights for businesses and institutions.
+**Know your crowd. Shape your space.**
+
+CrowdInsight is a Python AI library that converts CCTV footage or live streams into meaningful insights. It detects and classifies entities like adults, children, men, women, and animals (e.g., dogs), tracks movement, and generates structured data for real-world applications — from retail stores to government buildings.
+
+---
+
+## 📁 Project Structure
+
+```bash
+CrowdInsight/
+│
+├── crowdinsight/             # Core Python package
+│   ├── __init__.py
+│   ├── analyzer.py           # Main interface (CrowdAnalyzer class)
+│   ├── detector.py           # Object detection logic (YOLOv8, etc.)
+│   ├── tracker.py            # Person tracking module (DeepSORT, ByteTrack)
+│   ├── utils.py              # Helper functions
+│   ├── visualizer.py         # Draw boxes, labels, etc.
+│   └── config.py             # Configuration settings
+│
+├── examples/                 # Example scripts
+│   ├── analyze_video.py
+│   └── analyze_live.py
+│
+├── assets/                   # Branding, logos, sample media
+│   └── CrowdInsight.png
+│
+├── videos/                   # Sample video files (for local tests)
+│   └── cctv.mp4
+│
+├── outputs/                  # Output results (CSV, JSON, images)
+│   └── output.csv
+│
+├── tests/                    # Unit tests
+│   └── test_analyzer.py
+│
+├── README.md                 # Project overview and instructions
+├── requirements.txt          # Required Python packages
+└── setup.py                  # PyPI packaging file
+```
 
 ---
 
 ## 🚀 Features
 
-- 📹 CCTV Video File & Live Stream Input  
-- 🧠 Object Detection & Classification (adult, child, male, female, dog)  
-- 🔁 Visitor Tracking with DeepSORT or ByteTrack  
-- 📊 Analytics Engine for temporal and demographic patterns  
-- 📤 Export to CSV/JSON for external dashboards  
-- ⚙️ Modular and extendable  
+- 🎥 Video file & live webcam/IP stream support
+- 🧠 Real-time object detection and classification
+- 📍 Visitor tracking using DeepSORT/ByteTrack
+- 📊 Structured analytics export (CSV/JSON)
+- ⚙️ Modular and extensible for custom use cases
 
 ---
 
@@ -25,11 +63,11 @@ CrowdInsight is a Python-based computer vision and AI library designed to analyz
 pip install crowdinsight
 ```
 
-> Note: Currently under development – not yet on PyPI.
+> ⚠️ Note: This project is currently in development and not yet on PyPI.
 
 ---
 
-## 📁 Example Usage
+## 💡 Example Usage
 
 ### ▶️ Analyze a Video File
 
@@ -40,79 +78,96 @@ analyzer = CrowdAnalyzer(video_path="videos/cctv.mp4")
 results = analyzer.run_analysis()
 
 print(results.summary())
-results.export_csv("output.csv")
+results.export_csv("outputs/output.csv")
 ```
 
-### 📡 Analyze Live Webcam or IP Camera
+### 📡 Analyze a Live Stream
 
 ```python
 from crowdinsight import CrowdAnalyzer
 
-analyzer = CrowdAnalyzer(video_source=0)  # Use 0 for default webcam or 'rtsp://...' for IP cam
+analyzer = CrowdAnalyzer(video_source=0)  # 0 = webcam or use IP cam RTSP
 analyzer.run_live_stream()
 ```
 
 ---
 
-## 🧠 Model Backends
+## 🧠 Technology Stack
 
-- YOLOv8 for real-time object detection  
-- DeepSORT or ByteTrack for tracking across frames  
-- Age & Gender Estimation with pre-trained CNNs  
-
----
-
-## 💼 Use Cases
-
-- 🏪 Retail: Analyze customer footfall & peak times  
-- 🏨 Hotels: Understand demographics & optimize service  
-- 🏛️ Government: Monitor public space usage  
-- 🐶 Smart Cities: Pet & demographic-aware surveillance  
+- YOLOv8 / YOLO-NAS (object detection)
+- DeepSORT / ByteTrack (object tracking)
+- Pre-trained CNNs (age/gender estimation)
+- OpenCV, PyTorch, Ultralytics
 
 ---
 
-## 📊 Sample Output Format
+## 📊 Sample Output (JSON)
 
 ```json
 {
-  "timestamp": "2025-05-27T14:45:12",
+  "timestamp": "2025-05-27T15:00:00",
   "summary": {
-    "total_visitors": 57,
-    "adults": 39,
-    "children": 10,
-    "males": 29,
-    "females": 24,
-    "dogs": 4
+    "total_visitors": 73,
+    "adults": 49,
+    "children": 12,
+    "males": 37,
+    "females": 28,
+    "dogs": 5
   },
   "hourly_breakdown": {
     "09:00": {"visitors": 10},
-    "10:00": {"visitors": 18}
+    "10:00": {"visitors": 21},
+    "11:00": {"visitors": 42}
   }
 }
 ```
 
 ---
 
-## 🛠️ Roadmap
+## 🧪 Testing
 
-- [ ] Video file support  
-- [ ] Live stream camera support  
-- [ ] Anomaly detection (e.g., crowd spikes)  
-- [ ] Real-time dashboard  
-- [ ] REST API with FastAPI  
+Run all unit tests:
+
+```bash
+pytest tests/
+```
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Video file analysis
+- [ ] Live stream support
+- [ ] Basic demographic tracking
+- [ ] Real-time anomaly detection
+- [ ] Web dashboard integration (next stage)
+- [ ] REST API (FastAPI)
+- [ ] Deployment container (Docker)
+
+---
+
+## 🎯 Target Use Cases
+
+- 🏪 **Retail**: Understand customer flow and demographics
+- 🏨 **Hospitality**: Improve service based on real visitor data
+- 🏛️ **Public Sector**: Monitor and analyze usage of public spaces
+- 🐾 **Pet-Friendly Spaces**: Identify non-human traffic too
 
 ---
 
 ## 🤝 Contributing
 
-We welcome PRs and ideas! Feel free to open issues or contact us.
+Got ideas? Found bugs? Want to collaborate?
+We welcome contributions!  
+Please open an issue or submit a pull request.
 
 ---
 
 ## 📄 License
 
-MIT License
+**MIT License**  
+Free to use, share, and modify with attribution.
 
 ---
 
-> Built with ❤️ by people who care about data-driven environments.
+> Built with ❤️ to bridge the physical world and data intelligence.
