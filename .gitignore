@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+venv/
+crowd_env/
+.env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings
+.vscode/
+
+# macOS
+.DS_Store
+
+# Output files
+outputs/
+*.csv
+*.json
+
+# Logs
+*.log
+
+# Model weights / large files (optionally)
+*.pt
+*.h5
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Test cache
+.pytest_cache/
