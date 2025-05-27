@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/CrowdInsight.png" alt="CrowdInsight Logo" width="1000", border-radius="22px"/>
+  <img src="assets/CrowdInsight.png" alt="CrowdInsight Logo" width="1000px"/>
 </p>
 
 # CrowdInsight
@@ -49,11 +49,11 @@ CrowdInsight/
 
 ## 🚀 Features
 
-- 🎥 Video file & live webcam/IP stream support
-- 🧠 Real-time object detection and classification
-- 📍 Visitor tracking using DeepSORT/ByteTrack
-- 📊 Structured analytics export (CSV/JSON)
-- ⚙️ Modular and extensible for custom use cases
+- 🎥 Video file & live webcam/IP stream support  
+- 🧠 Real-time object detection and classification  
+- 📍 Visitor tracking using DeepSORT/ByteTrack  
+- 📊 Structured analytics export (CSV/JSON)  
+- ⚙️ Modular and extensible for custom use cases  
 
 ---
 
@@ -94,10 +94,10 @@ analyzer.run_live_stream()
 
 ## 🧠 Technology Stack
 
-- YOLOv8 / YOLO-NAS (object detection)
-- DeepSORT / ByteTrack (object tracking)
-- Pre-trained CNNs (age/gender estimation)
-- OpenCV, PyTorch, Ultralytics
+- YOLOv8 / YOLO-NAS (object detection)  
+- DeepSORT / ByteTrack (object tracking)  
+- Pre-trained CNNs (age/gender estimation)  
+- OpenCV, PyTorch, Ultralytics  
 
 ---
 
@@ -136,28 +136,28 @@ pytest tests/
 
 ## 🗺️ Roadmap
 
-- [ ] Video file analysis
-- [ ] Live stream support
-- [ ] Basic demographic tracking
-- [ ] Real-time anomaly detection
-- [ ] Web dashboard integration (next stage)
-- [ ] REST API (FastAPI)
-- [ ] Deployment container (Docker)
+- [x] Video file analysis  
+- [ ] Live stream support  
+- [ ] Basic demographic tracking  
+- [ ] Real-time anomaly detection  
+- [ ] Web dashboard integration (next stage)  
+- [ ] REST API (FastAPI)  
+- [ ] Deployment container (Docker)  
 
 ---
 
 ## 🎯 Target Use Cases
 
-- 🏪 **Retail**: Understand customer flow and demographics
-- 🏨 **Hospitality**: Improve service based on real visitor data
-- 🏛️ **Public Sector**: Monitor and analyze usage of public spaces
-- 🐾 **Pet-Friendly Spaces**: Identify non-human traffic too
+- 🏪 **Retail**: Understand customer flow and demographics  
+- 🏨 **Hospitality**: Improve service based on real visitor data  
+- 🏛️ **Public Sector**: Monitor and analyze usage of public spaces  
+- 🐾 **Pet-Friendly Spaces**: Identify non-human traffic too  
 
 ---
 
 ## 🤝 Contributing
 
-Got ideas? Found bugs? Want to collaborate?
+Got ideas? Found bugs? Want to collaborate?  
 We welcome contributions!  
 Please open an issue or submit a pull request.
 
