@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/CrowdInsight.png" alt="CrowdInsight Logo" width="1000", borderradius="22px"/>
+  <img src="assets/CrowdInsight.png" alt="CrowdInsight Logo" width="1000", border-radius="22px"/>
 </p>
 
 # CrowdInsight
