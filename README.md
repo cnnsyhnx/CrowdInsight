@@ -38,8 +38,13 @@ CrowdInsight/
 │   └── output.csv
 │
 ├── tests/                    # Unit tests
-│   └── test_analyzer.py
+│   ├── test_analyzer.py
+│   ├── test_detector.py
+│   ├── test_tracker.py
+│   └── test_utils.py 
 │
+├── .gitignore                # Ignore files/folders for GitHub
+├── LICENSE                   # Creative Commons Attribution-NoDerivatives 4.0 International Public License
 ├── README.md                 # Project overview and instructions
 ├── requirements.txt          # Required Python packages
 └── setup.py                  # PyPI packaging file
