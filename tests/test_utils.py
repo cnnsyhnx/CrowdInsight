@@ -19,8 +19,9 @@ class TestUtils(unittest.TestCase):
             "track_threshold": 0.5
         }
         self.test_config_path = "test_config.json"
-        self.test_output_path = "test_output.json"
-        
+        self.test_output_dir = "test_outputs"
+        self.test_output_path = os.path.join(self.test_output_dir, "test_output.json")
+        os.makedirs(self.test_output_dir, exist_ok=True)
         # Create test config file
         with open(self.test_config_path, 'w') as f:
             json.dump(self.test_config, f)
@@ -30,7 +31,15 @@ class TestUtils(unittest.TestCase):
         if os.path.exists(self.test_config_path):
             os.remove(self.test_config_path)
         if os.path.exists(self.test_output_path):
-            os.remove(self.test_output_path)
+            try:
+                os.remove(self.test_output_path)
+            except Exception:
+                pass
+        if os.path.exists(self.test_output_dir):
+            try:
+                os.rmdir(self.test_output_dir)
+            except Exception:
+                pass
 
     def test_setup_logger(self):
         logger = setup_logger("test_logger")
@@ -51,13 +60,9 @@ class TestUtils(unittest.TestCase):
                 "children": 2
             }
         }
-        
         save_results(test_results, self.test_output_path)
-        
-        # Check if file exists
+        # Verify file exists and content is correct
         self.assertTrue(os.path.exists(self.test_output_path))
-        
-        # Check content
         with open(self.test_output_path, 'r') as f:
             saved_results = json.load(f)
         self.assertEqual(saved_results, test_results)

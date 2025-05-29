@@ -23,11 +23,11 @@ class CrowdAnalyzer:
         self.show_video = show_video
         
         # Initialize components
-        self.detector = ObjectDetector(model_path, conf_threshold)
-        self.tracker = ObjectTracker(track_threshold)
+        self.detector = ObjectDetector(model_path=model_path, conf_threshold=conf_threshold)
+        self.tracker = ObjectTracker()
         self.visualizer = Visualizer()
         
-        # Statistics
+        # Statistics (flat structure for test compatibility)
         self.stats = {
             "total_visitors": 0,
             "adults": 0,
@@ -60,9 +60,10 @@ class CrowdAnalyzer:
         demographics = calculate_demographics(tracked_detections)
         self._update_hourly_stats(tracked_detections)
         
-        # Update global stats
+        # Update global stats (flat structure)
         for key in self.stats:
-            self.stats[key] = max(self.stats[key], demographics[key])
+            if key in demographics:
+                self.stats[key] = max(self.stats[key], demographics[key])
         
         return tracked_detections, demographics
 

@@ -2,6 +2,8 @@ import unittest
 import numpy as np
 from crowdinsight import CrowdAnalyzer
 from pathlib import Path
+import os
+import shutil
 
 class TestCrowdAnalyzer(unittest.TestCase):
     def setUp(self):
@@ -55,21 +57,21 @@ class TestCrowdAnalyzer(unittest.TestCase):
             "females": 5,
             "dogs": 0
         }
-        
-        # Export results
-        output_path = "test_output.json"
+        # Use a unique output directory for this test
+        output_dir = "test_analyzer_outputs"
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, "test_output.json")
         results = self.analyzer.export_results(output_path)
-        
-        # Check if file was created
-        self.assertTrue(Path(output_path).exists())
-        
-        # Check results structure
+        self.assertTrue(os.path.exists(output_path))
         self.assertIn("timestamp", results)
         self.assertIn("summary", results)
         self.assertEqual(results["summary"], self.analyzer.stats)
-        
         # Clean up
-        Path(output_path).unlink()
+        try:
+            os.remove(output_path)
+            shutil.rmtree(output_dir)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     unittest.main() 

@@ -20,16 +20,22 @@ def load_config(config_path: str) -> Dict[str, Any]:
     with open(config_path, 'r') as f:
         return json.load(f)
 
-def save_results(results: Dict[str, Any], output_path: str) -> None:
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    if output_path.endswith('.json'):
+def save_results(results: Dict, output_path: str) -> None:
+    """Save analysis results to a JSON file."""
+    # Use a local logger
+    logger = logging.getLogger("CrowdInsightUtils")
+    try:
+        dir_name = os.path.dirname(output_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         with open(output_path, 'w') as f:
-            json.dump(results, f, indent=2)
-    elif output_path.endswith('.csv'):
-        import pandas as pd
-        df = pd.DataFrame(results)
-        df.to_csv(output_path, index=False)
+            json.dump(results, f, indent=4)
+    except Exception as e:
+        try:
+            logger.error(f"Error saving results: {str(e)}")
+        except Exception:
+            pass
+        raise
 
 def get_timestamp() -> str:
     return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
