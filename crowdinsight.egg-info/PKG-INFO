@@ -1,3 +1,33 @@
+Metadata-Version: 2.4
+Name: crowdinsight
+Version: 0.1.0
+Summary: A Python AI library for crowd analysis from video streams
+Home-page: https://github.com/yourusername/crowdinsight
+Author: CrowdInsight Team
+Author-email: your.email@example.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: opencv-python>=4.5.0
+Requires-Dist: torch>=1.7.0
+Requires-Dist: ultralytics>=8.0.0
+Requires-Dist: numpy>=1.19.0
+Requires-Dist: pandas>=1.2.0
+Requires-Dist: pillow>=8.0.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 <p align="center">
   <img src="assets/CrowdInsight.png" alt="CrowdInsight Logo" width="1000px"/>
 </p>
