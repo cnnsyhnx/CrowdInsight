@@ -1,97 +1,51 @@
 YOLO_MODEL_PATH = "yolov8n.pt"  
 
 # Detection confidence threshold
-CONFIDENCE_THRESHOLD = 0.5
+CONFIDENCE_THRESHOLD = 0.3
 
 # Allowed object classes for detection
 ALLOWED_CLASSES = [
-    "person",
-    "bicycle",
-    "car",
-    "motorcycle",
-    "bus",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "backpack",
-    "umbrella",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
+    # People
+    "person", "man", "woman", "boy", "girl", "child",
+    
+    # Animals
+    "dog", "cat", "bird", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
+    
+    # Vehicles
+    "car", "bicycle", "motorcycle", "bus", "truck", "boat",
+    
+    # Items
+    "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
+    "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard",
     "tennis racket",
-    "bottle",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "couch",
-    "potted plant",
-    "bed",
-    "dining table",
-    "toilet",
-    "tv",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush"
+    
+    # Food and Drinks
+    "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+    "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake",
+    
+    # Furniture
+    "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv",
+    
+    # Electronics
+    "laptop", "mouse", "remote", "keyboard", "cell phone",
+    
+    # Kitchen Items
+    "microwave", "oven", "toaster", "sink", "refrigerator",
+    
+    # Other Items
+    "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush",
+    
+    # Additional Items
+    "coffee cup", "mug", "glass", "plate", "bowl", "utensils"
 ]
 
 # Device configuration
 DEVICE = "cuda"  # Options: "cuda", "cpu"
 
 # Face detection settings
-FACE_DETECTION_MIN_SIZE = 30
-FACE_DETECTION_SCALE_FACTOR = 1.1
-FACE_DETECTION_MIN_NEIGHBORS = 5
+FACE_DETECTION_MIN_SIZE = 20
+FACE_DETECTION_SCALE_FACTOR = 1.05
+FACE_DETECTION_MIN_NEIGHBORS = 3
 
 # Attribute analysis settings
 AGE_GROUPS = {

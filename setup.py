@@ -16,7 +16,8 @@ setup(
         "ultralytics>=8.0.0",
         "numpy>=1.19.0",
         "pandas>=1.2.0",
-        "pillow>=8.0.0"
+        "pillow>=8.0.0",
+        "deepface>=0.0.79"  # Added for face analysis
     ],
     author="CrowdInsight Team",
     author_email="your.email@example.com",
@@ -28,6 +29,19 @@ setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Scientific/Engineering :: Image Recognition",
     ],
     python_requires=">=3.6",
+    include_package_data=True,
+    package_data={
+        'crowdinsight': ['yolov8n.pt'],  # Include the model file
+    },
+    entry_points={
+        'console_scripts': [
+            'crowdinsight=run_live_detection:main',
+        ],
+    },
 )

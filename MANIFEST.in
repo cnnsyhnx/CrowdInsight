@@ -1,0 +1,9 @@
+include LICENSE
+include README.md
+include requirements.txt
+include yolov8n.pt
+recursive-include examples *
+recursive-include tests *
+recursive-include assets *
+recursive-include crowdinsight *.py
+recursive-include crowdinsight *.pt 

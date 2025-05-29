@@ -10,6 +10,22 @@ def main():
     parser.add_argument("--output", type=str, help="Output path for results (optional)")
     args = parser.parse_args()
 
+    print("\n=== CrowdInsight Live Detection ===")
+    print("Detectable Objects:")
+    print("1. People (age, gender, posture)")
+    print("2. Animals (dog, cat, bird, horse, sheep, cow, elephant, bear, zebra, giraffe)")
+    print("3. Vehicles (car, bicycle, motorcycle, bus, truck, boat)")
+    print("4. Items (backpack, umbrella, handbag, tie, suitcase, etc.)")
+    print("5. Food (banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza)")
+    print("6. Furniture (chair, couch, bed, dining table, toilet, tv)")
+    print("7. Electronics (laptop, mouse, remote, keyboard, cell phone)")
+    print("8. Kitchen Items (microwave, oven, toaster, sink, refrigerator)")
+    print("\nUsage:")
+    print("- Press 'q' to quit")
+    print("- Confidence score shown for each object")
+    print("- Additional attributes shown for people (age, gender, posture)")
+    print("================================\n")
+
     # Initialize analyzer with live stream
     analyzer = CrowdAnalyzer(
         video_source=args.source,
@@ -37,9 +53,9 @@ def main():
         print(f"Dogs: {results['summary']['dogs']}")
         
     except KeyboardInterrupt:
-        print("\nAnalysis stopped by user")
+        print("\nProgram stopped by user")
     except Exception as e:
-        print(f"\nError: {str(e)}")
+        print(f"\nError occurred: {str(e)}")
 
 if __name__ == "__main__":
     main()

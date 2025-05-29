@@ -1,0 +1,2 @@
+[console_scripts]
+crowdinsight = run_live_detection:main

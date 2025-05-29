@@ -23,59 +23,50 @@ class Visualizer:
     def draw_detections(self, frame: np.ndarray, detections: List[Dict[str, Any]]) -> np.ndarray:
         for det in detections:
             bbox = det['bbox']
-            track_id = det.get('track_id', -1)
-            class_name = det.get('class', 'unknown')
+            label = det['label']
             confidence = det.get('confidence', 0.0)
-            metrics = det.get('metrics', {})
             attributes = det.get('attributes', {})
 
-            # Get color based on track_id
-            color = self.colors[track_id % len(self.colors)] if track_id >= 0 else (0, 255, 0)
+            # Get color and category based on object type
+            if label in ["person", "man", "woman", "boy", "girl", "child"]:
+                color = (0, 255, 0)  # Green for people
+                category = "Person"
+            elif label in ["dog", "cat", "bird", "horse", "sheep", "cow"]:
+                color = (0, 165, 255)  # Orange for animals
+                category = "Animal"
+            elif label in ["car", "bicycle", "motorcycle", "bus", "truck", "boat"]:
+                color = (255, 0, 0)  # Blue for vehicles
+                category = "Vehicle"
+            else:
+                color = (255, 255, 0)  # Cyan for other objects
+                category = "Object"
 
             # Draw bounding box
             x1, y1, x2, y2 = map(int, bbox)
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, self.thickness)
 
-            # Prepare detailed label
-            label_parts = []
-            if track_id >= 0:
-                label_parts.append(f"ID:{track_id}")
-            label_parts.append(f"{class_name}")
-            label_parts.append(f"Conf:{confidence:.2f}")
+            # Prepare label
+            label_parts = [f"{category} ({confidence:.2f})"]
             
-            # Add attributes to label based on object type
-            if class_name in ["person", "man", "woman", "boy", "girl", "child"]:
+            # Add attributes based on object type
+            if category == "Person":
+                if attributes.get('gender'):
+                    label_parts.append(f"Gender: {attributes['gender']}")
                 if attributes.get('age_group'):
-                    label_parts.append(f"Age:{attributes['age_group']}")
+                    label_parts.append(f"Age: {attributes['age_group']}")
+                if attributes.get('emotion'):
+                    label_parts.append(f"Emotion: {attributes['emotion']}")
                 if attributes.get('posture'):
-                    label_parts.append(f"Posture:{attributes['posture']}")
-                if attributes.get('estimated_height'):
-                    label_parts.append(f"H:{attributes['estimated_height']}m")
-                if attributes.get('estimated_weight'):
-                    label_parts.append(f"W:{attributes['estimated_weight']}kg")
+                    label_parts.append(f"Posture: {attributes['posture']}")
             
-            elif class_name in ["dog", "cat"]:
-                if attributes.get('breed'):
-                    label_parts.append(f"Breed:{attributes['breed']}")
-                if attributes.get('size'):
-                    label_parts.append(f"Size:{attributes['size']}")
-                if attributes.get('color'):
-                    label_parts.append(f"Color:{attributes['color']}")
+            elif category == "Animal":
+                label_parts.append(f"Type: {label}")
             
-            elif class_name in ["car", "truck", "bus", "motorcycle", "bicycle"]:
-                if attributes.get('type'):
-                    label_parts.append(f"Type:{attributes['type']}")
-                if attributes.get('color'):
-                    label_parts.append(f"Color:{attributes['color']}")
-                if attributes.get('size'):
-                    label_parts.append(f"Size:{attributes['size']}")
-
-            # Add size information if available
-            if metrics:
-                label_parts.append(f"Size:{int(metrics.get('width', 0))}x{int(metrics.get('height', 0))}")
-                if 'center_point' in metrics:
-                    center_x, center_y = metrics['center_point']
-                    cv2.circle(frame, (center_x, center_y), 3, color, -1)
+            elif category == "Vehicle":
+                label_parts.append(f"Type: {label}")
+            
+            elif category == "Object":
+                label_parts.append(f"Type: {label}")
 
             label = " | ".join(label_parts)
 
@@ -85,12 +76,6 @@ class Visualizer:
             
             # Draw label text
             cv2.putText(frame, label, (x1, y1 - 5), self.font, self.font_scale, (255, 255, 255), self.thickness)
-
-            # Draw track history if available
-            if 'track_history' in det and det['track_history']:
-                history = det['track_history']
-                for i in range(1, len(history)):
-                    cv2.line(frame, history[i-1], history[i], color, 1)
 
         return frame
 
@@ -112,15 +97,54 @@ class Visualizer:
 
         return frame
 
-    def draw_stats(self, frame: np.ndarray, stats: Dict[str, int]) -> np.ndarray:
-        y_offset = 30
-        for key, value in stats.items():
-            text = f"{key}: {value}"
-            cv2.putText(frame, text, (10, y_offset), self.font, self.font_scale, (255, 255, 255), self.thickness)
+    def draw_stats(self, frame: np.ndarray, stats: Dict[str, Any]) -> np.ndarray:
+        """Draw statistics on the frame"""
+        # Create semi-transparent overlay
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (10, 10), (300, 200), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+        
+        # Draw GPU info if available
+        if "gpu_info" in stats:
+            gpu_info = stats["gpu_info"]
+            y_offset = 30
+            cv2.putText(frame, f"GPU: {gpu_info['device']}", (20, y_offset), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             y_offset += 20
+            cv2.putText(frame, f"Memory: {gpu_info['memory_used']:.1f} GB", (20, y_offset), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            y_offset += 30
+        
+        # Draw statistics by category
+        categories = {
+            "People": ["total_visitors", "males", "females", "children", "adults"],
+            "Animals": ["dogs", "cats", "birds"],
+            "Vehicles": ["cars", "bicycles", "motorcycles"],
+            "Objects": ["bottles", "cups", "phones", "laptops"]
+        }
+        
+        y_offset = 80
+        for category, items in categories.items():
+            cv2.putText(frame, category, (20, y_offset), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            y_offset += 20
+            
+            for item in items:
+                if item in stats:
+                    value = stats[item]
+                    if value > 0:  # Only show non-zero values
+                        cv2.putText(frame, f"{item}: {value}", (30, y_offset), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                        y_offset += 20
+        
         return frame
 
     def draw_fps(self, frame: np.ndarray, fps: float) -> np.ndarray:
         text = f"FPS: {fps:.1f}"
-        cv2.putText(frame, text, (frame.shape[1] - 100, 30), self.font, self.font_scale, (0, 255, 0), self.thickness)
+        # Create a semi-transparent background for FPS
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (frame.shape[1] - 120, 10), (frame.shape[1] - 10, 40), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+        
+        cv2.putText(frame, text, (frame.shape[1] - 110, 30), self.font, self.font_scale, (0, 255, 0), self.thickness)
         return frame

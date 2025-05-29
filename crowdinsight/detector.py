@@ -2,25 +2,79 @@ from ultralytics import YOLO
 import cv2
 from deepface import DeepFace
 import numpy as np
-from .config import YOLO_MODEL_PATH, CONFIDENCE_THRESHOLD, ALLOWED_CLASSES, DEVICE
+from .config import YOLO_MODEL_PATH, CONFIDENCE_THRESHOLD, ALLOWED_CLASSES, DEVICE, AGE_GROUPS, POSTURE_THRESHOLDS
 import torch
+from typing import List, Dict, Any
+import time
 
 class ObjectDetector:
-    def __init__(self, model_path=YOLO_MODEL_PATH):
+    def __init__(self, model_path=YOLO_MODEL_PATH, conf_threshold=CONFIDENCE_THRESHOLD):
         try:
-            self.model = YOLO(model_path)
-            # Set device based on availability
-            if DEVICE == "cuda" and not torch.cuda.is_available():
-                print("Warning: CUDA requested but not available. Falling back to CPU.")
-                self.device = "cpu"
-            else:
-                self.device = DEVICE
+            # Force CUDA initialization
+            if torch.cuda.is_available():
+                # Set CUDA device
+                torch.cuda.set_device(0)
+                # Enable CUDA optimizations
+                torch.backends.cudnn.benchmark = True
+                torch.backends.cudnn.enabled = True
                 
+                # Get GPU info
+                self.gpu_name = torch.cuda.get_device_name(0)
+                self.gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+                self.cuda_available = True
+                
+                print("\n=== GPU Configuration ===")
+                print(f"Device: {self.gpu_name}")
+                print(f"Memory: {self.gpu_memory:.1f} GB")
+                
+                # Clear GPU memory
+                torch.cuda.empty_cache()
+                torch.cuda.memory.empty_cache()
+                
+                # Force CUDA memory allocation
+                dummy_tensor = torch.zeros((1000, 1000), device='cuda')
+                del dummy_tensor
+                torch.cuda.synchronize()
+            else:
+                print("\n=== CPU Mode ===")
+                self.cuda_available = False
+                self.gpu_name = "CPU"
+                self.gpu_memory = 0.0
+
+            # Initialize YOLO model
+            print(f"\nLoading YOLO model...")
+            self.model = YOLO(model_path)
+            
+            # Force model to GPU if available
+            if self.cuda_available:
+                print("Moving model to GPU...")
+                self.model = self.model.cuda()
+                # Force CUDA memory allocation with model
+                dummy_input = torch.zeros((1, 3, 640, 640), device='cuda')
+                with torch.no_grad():
+                    _ = self.model(dummy_input)
+                torch.cuda.synchronize()
+                print("Model moved to GPU successfully")
+            
+            self.conf_threshold = conf_threshold
+            self.device = "cuda" if self.cuda_available else "cpu"
+            
+            # Initialize class categories
+            self.person_classes = ["person", "man", "woman", "boy", "girl", "child"]
+            self.animal_classes = ["dog", "cat", "bird", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe"]
+            self.vehicle_classes = ["car", "bicycle", "motorcycle", "bus", "truck", "boat"]
+            self.food_classes = ["bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+                               "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake"]
+            
             # Initialize face detection
             self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            self.face_cache = {}
+            self.cache_size = 100
+            
+            print("Initialization complete!")
             
         except Exception as e:
-            raise RuntimeError(f"Failed to load YOLO model: {str(e)}")
+            raise RuntimeError(f"Failed to initialize detector: {str(e)}")
 
     def _detect_face(self, frame, bbox):
         """Detect face in the given bounding box and return face region"""
@@ -33,12 +87,12 @@ class ObjectDetector:
         # Convert to grayscale for face detection
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         
-        # Detect faces
+        # Detect faces with optimized parameters
         faces = self.face_cascade.detectMultiScale(
             gray,
             scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30)
+            minNeighbors=3,
+            minSize=(20, 20)
         )
         
         if len(faces) > 0:
@@ -48,114 +102,216 @@ class ObjectDetector:
             return roi[fy:fy+fh, fx:fx+fw]
         return None
 
-    def _analyze_attributes(self, frame, bbox):
-        """Analyze attributes of detected object"""
-        attributes = {
-            "gender": None,
-            "age_group": None,
-            "clothing": None,
-            "posture": None,
-            "estimated_height": None,
-            "estimated_weight": None
-        }
-        
-        # Detect face for person
-        face = self._detect_face(frame, bbox)
-        if face is not None and face.size > 0:
+    def _analyze_attributes(self, frame: np.ndarray, bbox: List[int]) -> Dict[str, Any]:
+        try:
+            x1, y1, x2, y2 = map(int, bbox)
+            face_img = frame[y1:y2, x1:x2]
+            
+            if face_img.size == 0:
+                return {
+                    "gender": "unknown",
+                    "age_group": "unknown",
+                    "posture": "unknown"
+                }
+
+            # Generate cache key
+            cache_key = f"{x1}_{y1}_{x2}_{y2}"
+            
+            # Check cache first
+            if cache_key in self.face_cache:
+                return self.face_cache[cache_key]
+
+            # Initialize default attributes
+            attributes = {
+                "gender": "unknown",
+                "age_group": "unknown",
+                "posture": "unknown"
+            }
+
+            # Try with OpenCV first (faster)
             try:
-                # Analyze face attributes
-                analysis = DeepFace.analyze(
-                    face,
-                    actions=['age', 'gender', 'emotion'],
+                face_analysis = DeepFace.analyze(
+                    face_img,
+                    actions=['age', 'gender'],
                     enforce_detection=False,
+                    detector_backend='opencv',
                     silent=True
                 )
                 
-                if isinstance(analysis, list):
-                    analysis = analysis[0]
-                
-                # Update attributes
-                attributes["gender"] = analysis.get("gender", None)
-                age = analysis.get("age", None)
-                if age is not None:
-                    if age < 18:
-                        attributes["age_group"] = "child"
-                    elif age < 60:
-                        attributes["age_group"] = "adult"
-                    else:
-                        attributes["age_group"] = "elderly"
-                
+                # Handle both single and multiple face results
+                if isinstance(face_analysis, list):
+                    face_analysis = face_analysis[0]
+
+                # Get gender
+                gender = face_analysis.get('gender', 'unknown')
+                if isinstance(gender, dict):
+                    gender = max(gender.items(), key=lambda x: x[1])[0].lower()
+                elif isinstance(gender, str):
+                    gender = gender.lower()
+                attributes["gender"] = gender
+
+                # Get age and determine age group
+                age = face_analysis.get('age', 0)
+                if age < 13:
+                    age_group = "child"
+                elif age < 60:
+                    age_group = "adult"
+                else:
+                    age_group = "elderly"
+                attributes["age_group"] = age_group
+
             except Exception as e:
-                print(f"Face analysis error: {str(e)}")
-        
-        # Estimate height and weight based on bbox
-        height = bbox[3] - bbox[1]
-        width = bbox[2] - bbox[0]
-        if height > 0:
-            # Rough estimation (assuming average person height is 170cm)
-            estimated_height = (height / frame.shape[0]) * 170
-            attributes["estimated_height"] = round(estimated_height, 1)
-            
-            # Rough weight estimation (BMI formula)
-            if estimated_height > 0:
-                bmi = 22  # Average BMI
-                estimated_weight = (estimated_height/100) ** 2 * bmi
-                attributes["estimated_weight"] = round(estimated_weight, 1)
-        
-        # Determine posture
-        if height > 0 and width > 0:
-            aspect_ratio = height / width
-            if aspect_ratio > 2.5:
-                attributes["posture"] = "standing"
-            elif aspect_ratio > 1.5:
-                attributes["posture"] = "sitting"
-            else:
-                attributes["posture"] = "lying"
-        
-        return attributes
+                print(f"Warning: Face analysis failed: {str(e)}")
+                # Fallback to RetinaFace if OpenCV fails
+                try:
+                    face_analysis = DeepFace.analyze(
+                        face_img,
+                        actions=['age', 'gender'],
+                        enforce_detection=False,
+                        detector_backend='retinaface',
+                        silent=True
+                    )
+                    
+                    # Process results as above
+                    if isinstance(face_analysis, list):
+                        face_analysis = face_analysis[0]
+                    
+                    # Update attributes with RetinaFace results
+                    gender = face_analysis.get('gender', 'unknown')
+                    if isinstance(gender, dict):
+                        gender = max(gender.items(), key=lambda x: x[1])[0].lower()
+                    attributes["gender"] = gender
+                    
+                    age = face_analysis.get('age', 0)
+                    if age < 13:
+                        age_group = "child"
+                    elif age < 60:
+                        age_group = "adult"
+                    else:
+                        age_group = "elderly"
+                    attributes["age_group"] = age_group
+                    
+                except Exception as e:
+                    print(f"Warning: RetinaFace analysis also failed: {str(e)}")
 
-    def detect(self, frame):
-        if frame is None or frame.size == 0:
-            raise ValueError("Invalid input frame")
+            # Calculate aspect ratio for posture
+            aspect_ratio = (x2 - x1) / (y2 - y1)
+            attributes["posture"] = "standing" if aspect_ratio > 0.8 else "sitting"
 
-        results = self.model.predict(
-            source=frame,
-            verbose=False,
-            conf=CONFIDENCE_THRESHOLD,
-            device=self.device
-        )[0]
-        
-        detections = []
+            # Update cache
+            if len(self.face_cache) >= self.cache_size:
+                self.face_cache.pop(next(iter(self.face_cache)))
+            self.face_cache[cache_key] = attributes
 
-        for result in results.boxes.data.tolist():
-            x1, y1, x2, y2, confidence, class_id = result
-            label = self.model.names[int(class_id)]
+            return attributes
 
-            # Skip if class not in allowed classes
-            if label not in ALLOWED_CLASSES:
-                continue
-
-            bbox = [int(x1), int(y1), int(x2), int(y2)]
-
-            detection = {
-                "label": label,
-                "confidence": float(confidence),
-                "bbox": bbox,
-                "metrics": {
-                    "width": float(x2 - x1),
-                    "height": float(y2 - y1),
-                    "area": float((x2 - x1) * (y2 - y1)),
-                    "center_point": [int((x1 + x2) / 2), int((y1 + y2) / 2)]
-                }
+        except Exception as e:
+            print(f"Warning: Face analysis error: {str(e)}")
+            return {
+                "gender": "unknown",
+                "age_group": "unknown",
+                "posture": "unknown"
             }
 
-            # Analyze attributes for person
-            if label == "person":
-                detection["attributes"] = self._analyze_attributes(frame, bbox)
+    def _get_gpu_utilization(self):
+        """Get current GPU utilization"""
+        if not self.cuda_available:
+            return {
+                "device": self.gpu_name,
+                "memory_used": 0.0
+            }
+            
+        try:
+            # Force CUDA synchronization
+            torch.cuda.synchronize()
+            # Get memory info
+            memory_allocated = torch.cuda.memory_allocated(0) / 1024**3
+            memory_reserved = torch.cuda.memory_reserved(0) / 1024**3
+            
+            return {
+                "device": self.gpu_name,
+                "memory_used": memory_allocated,
+                "memory_reserved": memory_reserved
+            }
+        except Exception as e:
+            print(f"Warning: GPU utilization tracking failed: {str(e)}")
+            return {
+                "device": self.gpu_name,
+                "memory_used": 0.0,
+                "memory_reserved": 0.0
+            }
 
-            detections.append(detection)
+    def get_gpu_stats(self) -> Dict[str, Any]:
+        """Get GPU statistics"""
+        return {
+            "device": self.gpu_name,
+            "total_memory": self.gpu_memory,
+            "memory_used": self._get_gpu_utilization()["memory_used"]
+        }
 
-        return detections
+    def detect(self, frame: np.ndarray) -> List[Dict[str, Any]]:
+        try:
+            # Get GPU utilization before detection
+            gpu_info = self._get_gpu_utilization()
+            
+            # Convert frame to tensor and move to GPU if available
+            if self.cuda_available:
+                frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).unsqueeze(0).float().cuda()
+            
+            # Run YOLO detection
+            results = self.model(
+                frame,
+                verbose=False,
+                conf=self.conf_threshold,
+                device=self.device,
+                half=True
+            )
+            
+            # Convert generator to list and get first result
+            results = list(results)[0]
+            
+            # Force CUDA synchronization
+            if self.cuda_available:
+                torch.cuda.synchronize()
+            
+            detections = []
+            for box in results.boxes:
+                confidence = float(box.conf[0])
+                if confidence < self.conf_threshold:
+                    continue
+
+                class_id = int(box.cls[0])
+                class_name = results.names[class_id]
+                
+                if class_name not in ALLOWED_CLASSES:
+                    continue
+
+                bbox = box.xyxy[0].tolist()
+                
+                # Get attributes for person detections
+                attributes = {}
+                if class_name in self.person_classes:
+                    attributes = self._analyze_attributes(frame, bbox)
+                elif class_name in self.animal_classes:
+                    attributes = {"type": class_name}
+                elif class_name in self.vehicle_classes:
+                    attributes = {"type": class_name}
+                elif class_name in self.food_classes:
+                    attributes = {"type": class_name}
+                
+                detections.append({
+                    "bbox": bbox,
+                    "label": class_name,
+                    "confidence": confidence,
+                    "attributes": attributes,
+                    "gpu_info": gpu_info
+                })
+
+            return detections
+
+        except Exception as e:
+            print(f"Detection error: {str(e)}")
+            return []
 
     def run_live_detection(self, camera_id=0, window_name="Live Detection"):
         """

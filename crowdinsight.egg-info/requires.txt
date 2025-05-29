@@ -4,3 +4,4 @@ ultralytics>=8.0.0
 numpy>=1.19.0
 pandas>=1.2.0
 pillow>=8.0.0
+deepface>=0.0.79

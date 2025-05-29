@@ -8,6 +8,10 @@ Author-email: your.email@example.com
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Scientific/Engineering :: Image Recognition
 Requires-Python: >=3.6
 Description-Content-Type: text/markdown
 License-File: LICENSE
@@ -17,6 +21,7 @@ Requires-Dist: ultralytics>=8.0.0
 Requires-Dist: numpy>=1.19.0
 Requires-Dist: pandas>=1.2.0
 Requires-Dist: pillow>=8.0.0
+Requires-Dist: deepface>=0.0.79
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier
