@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional
+import time
 
 def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
@@ -76,3 +77,18 @@ def format_results(demographics: Dict[str, int], hourly_data: Optional[Dict[str,
         results["hourly_breakdown"] = hourly_data
     
     return results
+
+def calculate_dwell_time(track_history, fps):
+    """
+    Calculate the dwell time (in seconds) for a tracked object based on its history.
+    
+    Args:
+        track_history (list): List of timestamps or frame numbers for the track.
+        fps (float): Frames per second of the video.
+    
+    Returns:
+        float: Dwell time in seconds.
+    """
+    if not track_history:
+        return 0.0
+    return len(track_history) / fps

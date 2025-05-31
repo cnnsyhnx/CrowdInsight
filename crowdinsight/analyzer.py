@@ -7,7 +7,7 @@ from pathlib import Path
 from .detector import ObjectDetector
 from .tracker import ObjectTracker
 from .visualizer import Visualizer
-from .utils import setup_logger, save_results, calculate_demographics, format_results
+from .utils import setup_logger, save_results, calculate_demographics, format_results, calculate_dwell_time
 
 class CrowdAnalyzer:
     def __init__(
@@ -265,3 +265,15 @@ class CrowdAnalyzer:
         results = format_results(self.stats, self.hourly_data)
         save_results(results, output_path)
         return results
+
+    def _process_video(self):
+        # ... existing code ...
+        analytics = {
+            'summary': self.stats,
+            'hourly_breakdown': self.hourly_data,
+            'dwell_times': {}
+        }
+        for track_id, track in self.tracker.tracks.items():
+            dwell_time = calculate_dwell_time(track.history, self.fps)
+            analytics['dwell_times'][track_id] = dwell_time
+        return analytics

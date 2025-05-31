@@ -48,6 +48,11 @@ def main():
                 visitors = data['visitors'] if isinstance(data, dict) and 'visitors' in data else data
                 print(f"{hour}: {visitors} visitors")
 
+        # Print dwell times for tracked objects
+        print("\nDwell Times (seconds):")
+        for track_id, dwell_time in results.get('dwell_times', {}).items():
+            print(f"Track {track_id}: {dwell_time:.2f} seconds")
+
         print(f"\nResults saved to: {args.output}")
     except Exception as e:
         print(f"\nError occurred: {str(e)}")
