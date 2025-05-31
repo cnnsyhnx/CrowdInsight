@@ -74,7 +74,7 @@ pip install crowdinsight
 
 ## 💡 Example Usage
 
-### ▶️ Analyze a Video File
+### ▶️ Analyze a Video File (Python)
 
 ```python
 from crowdinsight import CrowdAnalyzer
@@ -84,27 +84,30 @@ analyzer = CrowdAnalyzer(
     video_source="videos/cctv.mp4",    # Video file path
     model_path="yolov8n.pt",           # YOLO model path
     conf_threshold=0.5,                # Detection confidence threshold
-    show_video=True                    # Show real-time visualization
+    show_video=True                    # Show real-time visualization (set False for headless)
 )
 
-# Run analysis and get results
+# Run analysis and get results (results saved to output_path)
 results = analyzer.run_analysis(output_path="outputs/results.json")
 
-# Print summary
-print(f"Total Visitors: {results['summary']['total_visitors']}")
-print(f"Adults: {results['summary']['adults']}")
-print(f"Children: {results['summary']['children']}")
-print(f"Males: {results['summary']['males']}")
-print(f"Females: {results['summary']['females']}")
-print(f"Dogs: {results['summary']['dogs']}")
+# Print all available analytics
+print("\nAnalysis Summary:")
+summary = results.get('summary', results.get('categories', {}))
+for key, value in summary.items():
+    print(f"{key.capitalize()}: {value}")
 
-# Print hourly breakdown
-print("\nHourly Breakdown:")
-for hour, data in results['hourly_breakdown'].items():
-    print(f"{hour}: {data['visitors']} visitors")
+# Print hourly breakdown if available
+hourly = results.get('hourly_breakdown', results.get('hourly_data', {}))
+if hourly:
+    print("\nHourly Breakdown:")
+    for hour, data in hourly.items():
+        visitors = data['visitors'] if isinstance(data, dict) and 'visitors' in data else data
+        print(f"{hour}: {visitors} visitors")
+
+print("\nResults saved to: outputs/results.json")
 ```
 
-### 📡 Analyze a Live Stream
+### 📡 Analyze a Live Stream (Python)
 
 ```python
 from crowdinsight import CrowdAnalyzer
@@ -114,7 +117,7 @@ analyzer = CrowdAnalyzer(
     video_source=0,                    # 0 for webcam, or RTSP URL for IP camera
     model_path="yolov8n.pt",
     conf_threshold=0.5,
-    show_video=True
+    show_video=True                    # Set False for headless servers
 )
 
 # Run live analysis
@@ -127,11 +130,34 @@ analyzer.export_results("outputs/live_results.json")
 ### 🖥️ Command Line Usage
 
 ```bash
-# For live stream analysis
-python examples/analyze_live.py --source 0 --model yolov8n.pt --conf 0.5 --output results.json
+# For live stream analysis (with all options)
+python examples/analyze_live.py --source 0 --model yolov8n.pt --conf 0.5 --output outputs/live_results.json --no-show
 
-# For video file analysis
-python examples/analyze_video.py
+# For video file analysis (with all options)
+python examples/analyze_video.py --video videos/cctv.mp4 --model yolov8n.pt --conf 0.5 --output outputs/results.json --no-show
+```
+
+> **Tip:** Use `--no-show` to disable video display for headless environments (e.g., servers, Docker).
+
+### 📤 Exporting Results
+
+Both the Python API and CLI examples support exporting analytics to JSON (or CSV, if implemented). Use the `output_path` argument or `--output` flag to specify the file.
+
+### 📋 Requirements
+
+```bash
+# Core dependencies
+opencv-python>=4.8.0
+torch>=2.0.0
+ultralytics>=8.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+filterpy>=1.4.5
+deepface>=0.0.79
+pillow>=10.0.0
+scikit-learn>=1.3.0
+tqdm>=4.65.0
+python-logging>=0.4.9.6
 ```
 
 ### 🎯 Key Features
@@ -156,20 +182,6 @@ python examples/analyze_video.py
   - Hourly statistics
   - Movement patterns
   - Export to JSON/CSV
-
-### 📋 Requirements
-
-```bash
-# Core dependencies
-opencv-python>=4.5.0
-torch>=1.7.0
-ultralytics>=8.0.0
-numpy>=1.19.0
-pandas>=1.2.0
-
-# Optional dependencies
-pillow>=8.0.0  # For image processing
-```
 
 ---
 
