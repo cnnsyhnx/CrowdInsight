@@ -4,119 +4,163 @@ from deepface import DeepFace
 import numpy as np
 from .config import YOLO_MODEL_PATH, CONFIDENCE_THRESHOLD, ALLOWED_CLASSES, DEVICE, AGE_GROUPS, POSTURE_THRESHOLDS
 import torch
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Tuple
 import time
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+import threading
 
 class ObjectDetector:
-    def __init__(self, model_path=YOLO_MODEL_PATH, conf_threshold=CONFIDENCE_THRESHOLD):
-        try:
-            # Force CUDA initialization
-            if torch.cuda.is_available():
-                # Set CUDA device
-                torch.cuda.set_device(0)
-                # Enable CUDA optimizations
-                torch.backends.cudnn.benchmark = True
-                torch.backends.cudnn.enabled = True
-                
-                # Get GPU info
-                self.gpu_name = torch.cuda.get_device_name(0)
-                self.gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-                self.cuda_available = True
-                
-                print("\n=== GPU Configuration ===")
-                print(f"Device: {self.gpu_name}")
-                print(f"Memory: {self.gpu_memory:.1f} GB")
-                
-                # Clear GPU memory
-                torch.cuda.empty_cache()
-                torch.cuda.memory.empty_cache()
-                
-                # Force CUDA memory allocation
-                dummy_tensor = torch.zeros((1000, 1000), device='cuda')
-                del dummy_tensor
-                torch.cuda.synchronize()
-            else:
-                print("\n=== CPU Mode ===")
-                self.cuda_available = False
-                self.gpu_name = "CPU"
-                self.gpu_memory = 0.0
+    def __init__(
+        self,
+        model_path: str = "yolov8n.pt",
+        conf_threshold: float = 0.5,
+        batch_size: int = 4,
+        max_workers: int = 4
+    ):
+        self.logger = logging.getLogger("ObjectDetector")
+        self.conf_threshold = conf_threshold
+        self.batch_size = batch_size
+        self.max_workers = max_workers
+        
+        # Initialize CUDA if available
+        self.cuda_available = torch.cuda.is_available()
+        if self.cuda_available:
+            self._initialize_cuda()
+        
+        # Initialize YOLO model
+        self._initialize_model(model_path)
+        
+        # Initialize face detection
+        self._initialize_face_detection()
+        
+        # Initialize batch processing
+        self.face_queue = Queue()
+        self.result_queue = Queue()
+        self._start_batch_processor()
 
-            # Initialize YOLO model
-            print(f"\nLoading YOLO model...")
+    def _initialize_cuda(self) -> None:
+        """Initialize CUDA settings and get GPU information"""
+        try:
+            torch.cuda.set_device(0)
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.enabled = True
+            
+            self.gpu_name = torch.cuda.get_device_name(0)
+            self.gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            
+            self.logger.info(f"GPU initialized: {self.gpu_name} ({self.gpu_memory:.1f} GB)")
+            
+            # Clear GPU memory
+            torch.cuda.empty_cache()
+            torch.cuda.memory.empty_cache()
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize CUDA: {str(e)}")
+            self.cuda_available = False
+            self.gpu_name = "CPU"
+            self.gpu_memory = 0.0
+
+    def _initialize_model(self, model_path: str) -> None:
+        """Initialize YOLO model with error handling"""
+        try:
+            self.logger.info("Loading YOLO model...")
             self.model = YOLO(model_path)
             
-            # Force model to GPU if available
             if self.cuda_available:
-                print("Moving model to GPU...")
                 self.model = self.model.cuda()
-                # Force CUDA memory allocation with model
+                # Warm up the model
                 dummy_input = torch.zeros((1, 3, 640, 640), device='cuda')
                 with torch.no_grad():
                     _ = self.model(dummy_input)
                 torch.cuda.synchronize()
-                print("Model moved to GPU successfully")
-            
-            self.conf_threshold = conf_threshold
-            self.device = "cuda" if self.cuda_available else "cpu"
-            
-            # Initialize class categories
-            self.person_classes = ["person", "man", "woman", "boy", "girl", "child"]
-            self.animal_classes = ["dog", "cat", "bird", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe"]
-            self.vehicle_classes = ["car", "bicycle", "motorcycle", "bus", "truck", "boat"]
-            self.food_classes = ["bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
-                               "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake"]
-            
-            # Initialize face detection
-            self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            self.face_cache = {}
-            self.cache_size = 100
-            
-            print("Initialization complete!")
+                self.logger.info("Model moved to GPU successfully")
             
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize detector: {str(e)}")
+            self.logger.error(f"Failed to initialize YOLO model: {str(e)}")
+            raise RuntimeError(f"Model initialization failed: {str(e)}")
 
-    def _detect_face(self, frame, bbox):
-        """Detect face in the given bounding box and return face region"""
-        x1, y1, x2, y2 = bbox
-        roi = frame[y1:y2, x1:x2]
-        
-        if roi.size == 0:
-            return None
-            
-        # Convert to grayscale for face detection
-        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        
-        # Detect faces with optimized parameters
-        faces = self.face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=3,
-            minSize=(20, 20)
+    def _initialize_face_detection(self) -> None:
+        """Initialize face detection components"""
+        try:
+            self.face_cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            )
+            self.face_cache = {}
+            self.cache_size = 100
+            self.logger.info("Face detection initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize face detection: {str(e)}")
+            raise RuntimeError(f"Face detection initialization failed: {str(e)}")
+
+    def _start_batch_processor(self) -> None:
+        """Start the batch processing thread for face detection"""
+        self.batch_processor = threading.Thread(
+            target=self._process_face_batches,
+            daemon=True
         )
-        
-        if len(faces) > 0:
-            # Get the largest face
-            face = max(faces, key=lambda x: x[2] * x[3])
-            fx, fy, fw, fh = face
-            return roi[fy:fy+fh, fx:fx+fw]
-        return None
+        self.batch_processor.start()
 
-    def _analyze_attributes(self, frame: np.ndarray, bbox: List[int]) -> Dict[str, Any]:
+    def _process_face_batches(self) -> None:
+        """Process batches of face detection requests"""
+        while True:
+            batch = []
+            try:
+                # Collect batch_size items or wait for timeout
+                while len(batch) < self.batch_size:
+                    try:
+                        item = self.face_queue.get(timeout=0.1)
+                        batch.append(item)
+                    except Queue.Empty:
+                        if batch:  # Process partial batch
+                            break
+                        continue
+
+                if batch:
+                    self._process_batch(batch)
+            except Exception as e:
+                self.logger.error(f"Batch processing error: {str(e)}")
+
+    def _process_batch(self, batch: List[Dict[str, Any]]) -> None:
+        """Process a batch of face detection requests"""
+        try:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = []
+                for item in batch:
+                    future = executor.submit(
+                        self._analyze_face,
+                        item['frame'],
+                        item['bbox'],
+                        item['cache_key']
+                    )
+                    futures.append((future, item['cache_key']))
+
+                for future, cache_key in futures:
+                    try:
+                        result = future.result()
+                        self.result_queue.put((cache_key, result))
+                    except Exception as e:
+                        self.logger.error(f"Face analysis error: {str(e)}")
+                        self.result_queue.put((cache_key, None))
+
+        except Exception as e:
+            self.logger.error(f"Batch processing error: {str(e)}")
+
+    def _analyze_face(
+        self,
+        frame: np.ndarray,
+        bbox: List[int],
+        cache_key: str
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze a single face with error handling"""
         try:
             x1, y1, x2, y2 = map(int, bbox)
             face_img = frame[y1:y2, x1:x2]
             
             if face_img.size == 0:
-                return {
-                    "gender": "unknown",
-                    "age_group": "unknown",
-                    "posture": "unknown"
-                }
+                return None
 
-            # Generate cache key
-            cache_key = f"{x1}_{y1}_{x2}_{y2}"
-            
             # Check cache first
             if cache_key in self.face_cache:
                 return self.face_cache[cache_key]
@@ -138,19 +182,16 @@ class ObjectDetector:
                     silent=True
                 )
                 
-                # Handle both single and multiple face results
                 if isinstance(face_analysis, list):
                     face_analysis = face_analysis[0]
 
-                # Get gender
+                # Process gender
                 gender = face_analysis.get('gender', 'unknown')
                 if isinstance(gender, dict):
                     gender = max(gender.items(), key=lambda x: x[1])[0].lower()
-                elif isinstance(gender, str):
-                    gender = gender.lower()
                 attributes["gender"] = gender
 
-                # Get age and determine age group
+                # Process age
                 age = face_analysis.get('age', 0)
                 if age < 13:
                     age_group = "child"
@@ -161,8 +202,8 @@ class ObjectDetector:
                 attributes["age_group"] = age_group
 
             except Exception as e:
-                print(f"Warning: Face analysis failed: {str(e)}")
-                # Fallback to RetinaFace if OpenCV fails
+                self.logger.warning(f"OpenCV face analysis failed: {str(e)}")
+                # Fallback to RetinaFace
                 try:
                     face_analysis = DeepFace.analyze(
                         face_img,
@@ -172,11 +213,9 @@ class ObjectDetector:
                         silent=True
                     )
                     
-                    # Process results as above
                     if isinstance(face_analysis, list):
                         face_analysis = face_analysis[0]
                     
-                    # Update attributes with RetinaFace results
                     gender = face_analysis.get('gender', 'unknown')
                     if isinstance(gender, dict):
                         gender = max(gender.items(), key=lambda x: x[1])[0].lower()
@@ -192,9 +231,9 @@ class ObjectDetector:
                     attributes["age_group"] = age_group
                     
                 except Exception as e:
-                    print(f"Warning: RetinaFace analysis also failed: {str(e)}")
+                    self.logger.warning(f"RetinaFace analysis also failed: {str(e)}")
 
-            # Calculate aspect ratio for posture
+            # Calculate posture
             aspect_ratio = (x2 - x1) / (y2 - y1)
             attributes["posture"] = "standing" if aspect_ratio > 0.8 else "sitting"
 
@@ -206,112 +245,98 @@ class ObjectDetector:
             return attributes
 
         except Exception as e:
-            print(f"Warning: Face analysis error: {str(e)}")
-            return {
-                "gender": "unknown",
-                "age_group": "unknown",
-                "posture": "unknown"
-            }
+            self.logger.error(f"Face analysis error: {str(e)}")
+            return None
 
-    def _get_gpu_utilization(self):
-        """Get current GPU utilization"""
-        if not self.cuda_available:
-            return {
-                "device": self.gpu_name,
-                "memory_used": 0.0
-            }
-            
+    def detect(self, frame: np.ndarray) -> List[Dict[str, Any]]:
+        """Detect objects in the frame with improved error handling"""
         try:
-            # Force CUDA synchronization
+            # Run YOLO detection
+            results = self.model(frame, conf=self.conf_threshold)[0]
+            
+            detections = []
+            for r in results.boxes.data.tolist():
+                x1, y1, x2, y2, conf, cls = r
+                if conf < self.conf_threshold:
+                    continue
+                
+                bbox = [x1, y1, x2, y2]
+                class_id = int(cls)
+                label = results.names[class_id]
+                
+                # Queue face analysis for people
+                if label in ["person", "man", "woman", "boy", "girl", "child"]:
+                    cache_key = f"{int(x1)}_{int(y1)}_{int(x2)}_{int(y2)}"
+                    self.face_queue.put({
+                        'frame': frame,
+                        'bbox': bbox,
+                        'cache_key': cache_key
+                    })
+                
+                detection = {
+                    'bbox': bbox,
+                    'confidence': conf,
+                    'class_id': class_id,
+                    'label': label
+                }
+                
+                detections.append(detection)
+            
+            # Process face analysis results
+            while not self.result_queue.empty():
+                cache_key, attributes = self.result_queue.get()
+                if attributes:
+                    for det in detections:
+                        if det['label'] in ["person", "man", "woman", "boy", "girl", "child"]:
+                            det['attributes'] = attributes
+                            break
+            
+            return detections
+            
+        except Exception as e:
+            self.logger.error(f"Detection error: {str(e)}")
+            return []
+
+    def get_gpu_stats(self) -> Dict[str, Any]:
+        """Get GPU statistics with error handling"""
+        try:
+            if not self.cuda_available:
+                return {
+                    "device": self.gpu_name,
+                    "total_memory": self.gpu_memory,
+                    "memory_used": 0.0
+                }
+            
             torch.cuda.synchronize()
-            # Get memory info
             memory_allocated = torch.cuda.memory_allocated(0) / 1024**3
             memory_reserved = torch.cuda.memory_reserved(0) / 1024**3
             
             return {
                 "device": self.gpu_name,
+                "total_memory": self.gpu_memory,
                 "memory_used": memory_allocated,
                 "memory_reserved": memory_reserved
             }
+            
         except Exception as e:
-            print(f"Warning: GPU utilization tracking failed: {str(e)}")
+            self.logger.error(f"GPU stats error: {str(e)}")
             return {
                 "device": self.gpu_name,
+                "total_memory": self.gpu_memory,
                 "memory_used": 0.0,
                 "memory_reserved": 0.0
             }
 
-    def get_gpu_stats(self) -> Dict[str, Any]:
-        """Get GPU statistics"""
-        return {
-            "device": self.gpu_name,
-            "total_memory": self.gpu_memory,
-            "memory_used": self._get_gpu_utilization()["memory_used"]
-        }
-
-    def detect(self, frame: np.ndarray) -> List[Dict[str, Any]]:
+    def __del__(self):
+        """Cleanup resources"""
         try:
-            # Get GPU utilization before detection
-            gpu_info = self._get_gpu_utilization()
-            
-            # Convert frame to tensor and move to GPU if available
+            if hasattr(self, 'model'):
+                del self.model
             if self.cuda_available:
-                frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).unsqueeze(0).float().cuda()
-            
-            # Run YOLO detection
-            results = self.model(
-                frame,
-                verbose=False,
-                conf=self.conf_threshold,
-                device=self.device,
-                half=True
-            )
-            
-            # Convert generator to list and get first result
-            results = list(results)[0]
-            
-            # Force CUDA synchronization
-            if self.cuda_available:
-                torch.cuda.synchronize()
-            
-            detections = []
-            for box in results.boxes:
-                confidence = float(box.conf[0])
-                if confidence < self.conf_threshold:
-                    continue
-
-                class_id = int(box.cls[0])
-                class_name = results.names[class_id]
-                
-                if class_name not in ALLOWED_CLASSES:
-                    continue
-
-                bbox = box.xyxy[0].tolist()
-                
-                # Get attributes for person detections
-                attributes = {}
-                if class_name in self.person_classes:
-                    attributes = self._analyze_attributes(frame, bbox)
-                elif class_name in self.animal_classes:
-                    attributes = {"type": class_name}
-                elif class_name in self.vehicle_classes:
-                    attributes = {"type": class_name}
-                elif class_name in self.food_classes:
-                    attributes = {"type": class_name}
-                
-                detections.append({
-                    "bbox": bbox,
-                    "label": class_name,
-                    "confidence": confidence,
-                    "attributes": attributes,
-                    "gpu_info": gpu_info
-                })
-
-            return detections
-
+                torch.cuda.empty_cache()
+                torch.cuda.memory.empty_cache()
         except Exception as e:
-            print(f"Detection error: {str(e)}")
-            return []
+            self.logger.error(f"Cleanup error: {str(e)}")
 
     def run_live_detection(self, camera_id=0, window_name="Live Detection"):
         """
